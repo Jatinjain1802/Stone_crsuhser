@@ -1,0 +1,210 @@
+// prisma/schema.prisma
+// ---------------------------------------------------------------
+// Prisma Schema defines our database structure.
+// Each `model` becomes a table in SQLite.
+// `@id` = primary key, `@unique` = no duplicates allowed,
+// `@default(autoincrement())` = auto-numbering IDs
+// `@relation` = foreign key (linking two tables together)
+// ---------------------------------------------------------------
+
+generator client {
+  provider      = "prisma-client-js"
+  // output to a local directory so Electron can bundle it
+  output        = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "sqlite"
+  // Stores the database file in /database/ folder
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------
+// User — Login accounts with role-based access
+// Roles: "admin" | "manager" | "accountant" | "gate"
+// ---------------------------------------------------------------
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  mobile    String?
+  password  String   // bcrypt hashed - NEVER store plain passwords!
+  role      String   @default("manager") // "admin" | "manager" | "accountant" | "gate"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------
+// Material — Types of stone/materials produced or used
+// Examples: Raw Stone, 10mm Gitti, 20mm Gitti, Dust, etc.
+// ---------------------------------------------------------------
+model Material {
+  id           Int           @id @default(autoincrement())
+  name         String
+  category     String        // "raw" | "finished"
+  unit         String        // "ton" | "CFT" | "unit"
+  currentStock Float         @default(0)
+  minStock     Float         @default(0) // Alert when below this
+  ratePerUnit  Float         @default(0) // Default selling rate
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  
+  // Relations (one Material has many StockEntries and InvoiceItems)
+  stockEntries  StockEntry[]
+  invoiceItems  InvoiceItem[]
+  productions   Production[]
+}
+
+// ---------------------------------------------------------------
+// StockEntry — Every stock movement (in or out)
+// Type "in" = stock received, "out" = stock dispatched
+// ---------------------------------------------------------------
+model StockEntry {
+  id         Int      @id @default(autoincrement())
+  materialId Int
+  material   Material @relation(fields: [materialId], references: [id])
+  type       String   // "in" | "out"
+  quantity   Float
+  date       DateTime @default(now())
+  source     String?  // Supplier name or vehicle number
+  note       String?
+  createdBy  Int      // User ID who entered this
+  createdAt  DateTime @default(now())
+}
+
+// ---------------------------------------------------------------
+// Customer — Buyers of stone material
+// Type: "regular" | "contractor" | "onetime"
+// ---------------------------------------------------------------
+model Customer {
+  id          Int       @id @default(autoincrement())
+  name        String
+  mobile      String
+  address     String?
+  gstin       String?   // GST Identification Number
+  creditLimit Float     @default(0)
+  type        String    @default("regular") // "regular" | "contractor" | "onetime"
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // One customer can have many invoices
+  invoices    Invoice[]
+}
+
+// ---------------------------------------------------------------
+// Invoice — GST bills issued to customers
+// Status: "paid" | "partial" | "unpaid"
+// Invoice No format: SCM/2025-26/0001
+// ---------------------------------------------------------------
+model Invoice {
+  id          Int           @id @default(autoincrement())
+  invoiceNo   String        @unique  // Auto-generated: SCM/2025-26/0001
+  customerId  Int
+  customer    Customer      @relation(fields: [customerId], references: [id])
+  date        DateTime      @default(now())
+  dueDate     DateTime?
+  gstPercent  Float         @default(18)
+  subtotal    Float         @default(0)
+  gstAmount   Float         @default(0)
+  totalAmount Float
+  paidAmount  Float         @default(0)
+  status      String        @default("unpaid") // "paid" | "partial" | "unpaid"
+  paymentMode String?       // "cash" | "upi" | "bank" | "credit"
+  notes       String?
+  createdBy   Int
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  // One invoice has many line items
+  items       InvoiceItem[]
+  payments    Payment[]
+}
+
+// ---------------------------------------------------------------
+// InvoiceItem — Each row in an invoice (material + qty + rate)
+// ---------------------------------------------------------------
+model InvoiceItem {
+  id         Int      @id @default(autoincrement())
+  invoiceId  Int
+  invoice    Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  materialId Int
+  material   Material @relation(fields: [materialId], references: [id])
+  quantity   Float
+  rate       Float
+  amount     Float    // quantity × rate
+}
+
+// ---------------------------------------------------------------
+// Payment — Payment records against an invoice
+// Allows tracking partial payments over time
+// ---------------------------------------------------------------
+model Payment {
+  id          Int      @id @default(autoincrement())
+  invoiceId   Int
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+  amount      Float
+  date        DateTime @default(now())
+  mode        String   // "cash" | "upi" | "bank"
+  reference   String?  // UPI transaction ID or cheque number
+  note        String?
+  createdBy   Int
+  createdAt   DateTime @default(now())
+}
+
+// ---------------------------------------------------------------
+// Vehicle — Truck entry/exit records at the gate
+// Type: "in" = incoming material, "out" = outgoing dispatch
+// ---------------------------------------------------------------
+model Vehicle {
+  id           Int      @id @default(autoincrement())
+  vehicleNo    String
+  driverName   String?
+  materialType String
+  entryWeight  Float?   // Weight at entry (in tons)
+  exitWeight   Float?   // Weight at exit (in tons)
+  netWeight    Float?   // Calculated: entryWeight - exitWeight
+  entryTime    DateTime @default(now())
+  exitTime     DateTime?
+  type         String   // "in" | "out"
+  challanNo    String?  // Delivery challan number
+  customerId   Int?     // Optional: which customer this is for
+  dieselLitre  Float?   // Diesel given (if applicable)
+  note         String?
+  createdBy    Int
+  createdAt    DateTime @default(now())
+}
+
+// ---------------------------------------------------------------
+// Expense — All costs incurred in running the plant
+// Categories: diesel | labour | maintenance | electricity | other
+// ---------------------------------------------------------------
+model Expense {
+  id          Int      @id @default(autoincrement())
+  category    String   // "diesel" | "labour" | "maintenance" | "electricity" | "other"
+  amount      Float
+  date        DateTime @default(now())
+  description String?
+  vendor      String?  // Who was paid
+  billNo      String?  // Receipt/bill number
+  addedBy     Int
+  createdAt   DateTime @default(now())
+}
+
+// ---------------------------------------------------------------
+// Production — Daily production output records
+// Records how much material was produced each day
+// ---------------------------------------------------------------
+model Production {
+  id          Int      @id @default(autoincrement())
+  date        DateTime @default(now())
+  materialId  Int
+  material    Material @relation(fields: [materialId], references: [id])
+  quantity    Float
+  machineId   String?  // Which crusher machine
+  shiftId     String?  // "morning" | "evening" | "night"
+  note        String?
+  addedBy     Int
+  createdAt   DateTime @default(now())
+}

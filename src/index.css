@@ -1,0 +1,481 @@
+/* src/index.css */
+/* ---------------------------------------------------------------
+   Global Design System
+   This file defines the design tokens (CSS variables) and base styles.
+   Using CSS variables allows easy theme changes from one place.
+   
+   LEARNING: CSS Custom Properties (variables) use the syntax:
+   --variable-name: value;   → defines
+   var(--variable-name)      → uses
+   ---------------------------------------------------------------*/
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* ---------------------------------------------------------------
+   Tailwind CSS v4 directives
+   @theme sets up Tailwind design tokens as CSS variables
+   --------------------------------------------------------------- */
+@import "tailwindcss";
+
+@theme {
+  /* Color Palette — Stone Crusher Brand */
+  --color-primary-50:  #fff7ed;
+  --color-primary-100: #ffedd5;
+  --color-primary-200: #fed7aa;
+  --color-primary-300: #fdba74;
+  --color-primary-400: #fb923c;
+  --color-primary-500: #f97316;  /* Brand primary orange */
+  --color-primary-600: #ea580c;
+  --color-primary-700: #c2410c;
+  --color-primary-800: #9a3412;
+  --color-primary-900: #7c2d12;
+
+  /* Stone/Dark colors for sidebar */
+  --color-stone-50:  #fafaf9;
+  --color-stone-100: #f5f5f4;
+  --color-stone-200: #e7e5e4;
+  --color-stone-300: #d6d3d1;
+  --color-stone-400: #a8a29e;
+  --color-stone-500: #78716c;
+  --color-stone-600: #57534e;
+  --color-stone-700: #44403c;
+  --color-stone-800: #292524;
+  --color-stone-900: #1c1917;
+
+  /* Status colors */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger:  #ef4444;
+  --color-info:    #3b82f6;
+
+  /* Sidebar */
+  --sidebar-width: 260px;
+  --sidebar-bg: #1c1917;
+  --sidebar-text: #d6d3d1;
+  --sidebar-active-bg: #f97316;
+  --sidebar-active-text: #ffffff;
+  
+  /* Topbar */
+  --topbar-height: 64px;
+
+  /* Font */
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+/* ---------------------------------------------------------------
+   CSS Reset + Base Styles
+   --------------------------------------------------------------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #f5f5f4;
+  color: #1c1917;
+  line-height: 1.5;
+  overflow: hidden; /* Prevent body scroll — app manages its own scroll */
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #d6d3d1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: #a8a29e; }
+
+/* ---------------------------------------------------------------
+   App Shell Layout
+   The app uses a fixed sidebar + scrollable main content layout
+   --------------------------------------------------------------- */
+.app-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  height: 100vh;
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  position: relative;
+  z-index: 10;
+}
+
+.main-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.topbar {
+  height: var(--topbar-height);
+  background: #ffffff;
+  border-bottom: 1px solid #e7e5e4;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.page-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+/* ---------------------------------------------------------------
+   Card Component
+   --------------------------------------------------------------- */
+.card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e7e5e4;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: box-shadow 0.2s ease;
+}
+
+.card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #292524;
+}
+
+/* ---------------------------------------------------------------
+   Stat Card — Dashboard summary numbers
+   --------------------------------------------------------------- */
+.stat-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e7e5e4;
+  padding: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1c1917;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 0.8125rem;
+  color: #78716c;
+  margin-top: 4px;
+}
+
+.stat-change {
+  font-size: 0.75rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 8px;
+}
+
+/* ---------------------------------------------------------------
+   Button Variants
+   --------------------------------------------------------------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #f97316;
+  color: #ffffff;
+}
+.btn-primary:hover:not(:disabled) { background: #ea580c; }
+
+.btn-secondary {
+  background: #f5f5f4;
+  color: #44403c;
+  border: 1px solid #e7e5e4;
+}
+.btn-secondary:hover:not(:disabled) { background: #e7e5e4; }
+
+.btn-danger {
+  background: #fef2f2;
+  color: #ef4444;
+  border: 1px solid #fecaca;
+}
+.btn-danger:hover:not(:disabled) { background: #fee2e2; }
+
+.btn-ghost {
+  background: transparent;
+  color: #78716c;
+}
+.btn-ghost:hover:not(:disabled) { background: #f5f5f4; }
+
+.btn-sm { padding: 6px 12px; font-size: 0.8125rem; }
+.btn-lg { padding: 12px 24px; font-size: 1rem; }
+
+/* ---------------------------------------------------------------
+   Form Elements
+   --------------------------------------------------------------- */
+.form-group { margin-bottom: 16px; }
+
+.form-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #44403c;
+  margin-bottom: 6px;
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d6d3d1;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #1c1917;
+  background: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  font-family: inherit;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.form-error {
+  font-size: 0.75rem;
+  color: #ef4444;
+  margin-top: 4px;
+}
+
+/* ---------------------------------------------------------------
+   Table Styles
+   --------------------------------------------------------------- */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.data-table th {
+  background: #f5f5f4;
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #78716c;
+  border-bottom: 1px solid #e7e5e4;
+}
+
+.data-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f5f5f4;
+  color: #292524;
+}
+
+.data-table tr:hover td { background: #fafaf9; }
+
+/* ---------------------------------------------------------------
+   Badge / Status Chip
+   --------------------------------------------------------------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.badge-success { background: #dcfce7; color: #166534; }
+.badge-warning { background: #fef9c3; color: #854d0e; }
+.badge-danger  { background: #fef2f2; color: #991b1b; }
+.badge-info    { background: #dbeafe; color: #1e40af; }
+.badge-neutral { background: #f5f5f4; color: #57534e; }
+
+/* ---------------------------------------------------------------
+   Modal Overlay
+   --------------------------------------------------------------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: fadeIn 0.15s ease;
+}
+
+.modal-box {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp 0.2s ease;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.modal-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1c1917;
+}
+
+/* ---------------------------------------------------------------
+   Page Header
+   --------------------------------------------------------------- */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1c1917;
+}
+
+.page-subtitle {
+  font-size: 0.875rem;
+  color: #78716c;
+  margin-top: 2px;
+}
+
+/* ---------------------------------------------------------------
+   Animations
+   --------------------------------------------------------------- */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+.animate-pulse { animation: pulse 1.5s ease-in-out infinite; }
+
+/* ---------------------------------------------------------------
+   Loading Skeleton
+   --------------------------------------------------------------- */
+.skeleton {
+  background: linear-gradient(90deg, #f5f5f4 25%, #e7e5e4 50%, #f5f5f4 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* ---------------------------------------------------------------
+   Utility Classes
+   --------------------------------------------------------------- */
+.text-primary { color: #f97316; }
+.text-success { color: #22c55e; }
+.text-warning { color: #f59e0b; }
+.text-danger  { color: #ef4444; }
+.text-muted   { color: #78716c; }
+
+.font-mono { font-family: 'Courier New', monospace; }
+
+.divider {
+  height: 1px;
+  background: #e7e5e4;
+  margin: 16px 0;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
