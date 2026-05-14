@@ -123,6 +123,9 @@ function registerBillingHandlers(ipcMain) {
         const gstAmount = (subtotal * invoiceFields.gstPercent) / 100
         const totalAmount = subtotal + gstAmount
         
+        // If status is 'paid', set paidAmount to totalAmount
+        const paidAmount = invoiceFields.status === 'paid' ? totalAmount : 0
+        
         // Create the invoice
         const invoice = await tx.invoice.create({
           data: {
@@ -131,6 +134,7 @@ function registerBillingHandlers(ipcMain) {
             subtotal,
             gstAmount,
             totalAmount,
+            paidAmount,
             createdBy,
             // Create all line items in the same transaction using `create` inside `create`
             items: {
@@ -230,6 +234,56 @@ function registerBillingHandlers(ipcMain) {
       return { success: false, message: error.message }
     }
   })
+
+  // Get all unpaid/partial invoices for a specific customer
+  ipcMain.handle('billing:get-customer-unpaid', async (event, customerId) => {
+    try {
+      const invoices = await prisma.invoice.findMany({
+        where: { 
+          customerId: parseInt(customerId),
+          status: { in: ['unpaid', 'partial'] }
+        },
+        include: { customer: true },
+        orderBy: { date: 'asc' }
+      })
+      return { success: true, invoices }
+    } catch (error) {
+      return { success: false, message: error.message }
+    }
+  })
+
+  // Get Payment Collection Stats (Total Outstanding & Today's Collections)
+  ipcMain.handle('billing:get-payment-stats', async () => {
+    try {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+
+      const [invoices, todayPayments] = await Promise.all([
+        prisma.invoice.findMany({
+          where: { status: { in: ['unpaid', 'partial'] } }
+        }),
+        prisma.payment.findMany({
+          where: { createdAt: { gte: today } }
+        })
+      ])
+
+      const totalOutstanding = invoices.reduce((sum, inv) => sum + (inv.totalAmount - inv.paidAmount), 0)
+      const collectionsToday = todayPayments.reduce((sum, p) => sum + p.amount, 0)
+      const customerCount = new Set(invoices.map(inv => inv.customerId)).size
+
+      return { 
+        success: true, 
+        totalOutstanding, 
+        collectionsToday, 
+        activeCustomers: customerCount,
+        paymentCount: todayPayments.length
+      }
+    } catch (error) {
+      return { success: false, message: error.message }
+    }
+  })
 }
+
+
 
 module.exports = { registerBillingHandlers }

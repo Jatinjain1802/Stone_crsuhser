@@ -20,8 +20,10 @@ import {
   ReceiptIndianRupee, 
   BarChart3, 
   Settings,
-  Hammer
+  Hammer,
+  Wallet
 } from 'lucide-react'
+
 import useAuthStore from '@/store/authStore'
 
 // Define our menu items. Each item has a label, path, icon, and optional roles allowed.
@@ -31,7 +33,9 @@ const MENU_ITEMS = [
   { label: 'Production', path: '/production', icon: <Hammer size={20} /> },
   { label: 'Vehicles', path: '/vehicles', icon: <Truck size={20} /> },
   { label: 'Billing', path: '/billing', icon: <FileText size={20} /> },
+  { label: 'Payments', path: '/payments', icon: <Wallet size={20} /> },
   { label: 'Customers', path: '/customers', icon: <Users size={20} /> },
+
   { label: 'Expenses', path: '/expenses', icon: <ReceiptIndianRupee size={20} /> },
   { label: 'Reports', path: '/reports', icon: <BarChart3 size={20} />, roles: ['admin', 'manager', 'accountant'] },
   { label: 'Settings', path: '/settings', icon: <Settings size={20} />, roles: ['admin'] },

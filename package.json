@@ -6,7 +6,7 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently \"cross-env NODE_ENV=development vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
-    "build": "vite build && electron-builder",
+    "build": "vite build && electron-builder -c electron-builder.config.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio"
@@ -23,7 +23,6 @@
   },
   "homepage": "https://github.com/Jatinjain1802/Stone_crsuhser#readme",
   "devDependencies": {
-    "@prisma/client": "^6.19.3",
     "@tailwindcss/vite": "^4.3.0",
     "@vitejs/plugin-react": "^6.0.1",
     "autoprefixer": "^10.5.0",
@@ -38,6 +37,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
+    "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

@@ -22,9 +22,13 @@ import {
   Trash2,
   AlertTriangle,
   History,
-  Boxes
+  Boxes,
+  Eye,
+  ArrowRightLeft
 } from 'lucide-react'
-import { inventoryService } from '@/services/api'
+
+import { inventoryService, vehicleService } from '@/services/api'
+
 import { formatNumber, getStatusBadge } from '@/utils/format.util'
 import { formatDate, timeAgo } from '@/utils/date.util'
 import useAppStore from '@/store/appStore'
@@ -37,11 +41,20 @@ export default function Inventory() {
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [vehicles, setVehicles] = useState([])
+  const [selectedVehicleId, setSelectedVehicleId] = useState('')
+  const [stockQuantity, setStockQuantity] = useState('')
+
+
   
   // Modal states
   const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false)
   const [isStockModalOpen, setIsStockModalOpen] = useState(false)
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
   const [editingMaterial, setEditingMaterial] = useState(null)
+  const [selectedMaterialHistory, setSelectedMaterialHistory] = useState(null)
+  const [categoryFilter, setCategoryFilter] = useState('all')
+
   
   const { notify } = useAppStore()
   const { user } = useAuthStore()
@@ -57,7 +70,11 @@ export default function Inventory() {
       
       if (matResult.success) setMaterials(matResult.materials)
       if (logResult.success) setLogs(logResult.entries)
+      
+      const vehResult = await vehicleService.getAll()
+      if (vehResult.success) setVehicles(vehResult.vehicles)
     } catch (error) {
+
       notify.error('Failed to load inventory data')
     } finally {
       setLoading(false)
@@ -68,13 +85,16 @@ export default function Inventory() {
     fetchData()
   }, [])
 
-  // Filtered materials based on search
+  // Filtered materials based on search and category
   const filteredMaterials = useMemo(() => {
-    return materials.filter(m => 
-      m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.category.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  }, [materials, searchTerm])
+    return materials.filter(m => {
+      const matchesSearch = m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          m.category.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesCategory = categoryFilter === 'all' || m.category === categoryFilter
+      return matchesSearch && matchesCategory
+    })
+  }, [materials, searchTerm, categoryFilter])
+
 
   // --- Material Actions ---
   
@@ -132,10 +152,11 @@ export default function Inventory() {
       materialId: parseInt(formData.get('materialId')),
       type: formData.get('type'),
       quantity: parseFloat(formData.get('quantity')),
-      source: formData.get('source'),
+      source: selectedVehicleId === 'none' ? formData.get('source_manual') : vehicles.find(v => v.id === parseInt(selectedVehicleId))?.vehicleNo || formData.get('source_manual'),
       note: formData.get('note'),
       createdBy: user.id
     }
+
 
     try {
       const result = await inventoryService.addStockEntry(data)
@@ -148,6 +169,19 @@ export default function Inventory() {
       }
     } catch (error) {
       notify.error('Stock update failed')
+    }
+  }
+
+  const handleVehicleChange = (vehId) => {
+    setSelectedVehicleId(vehId)
+    if (vehId !== 'none') {
+      const veh = vehicles.find(v => v.id === parseInt(vehId))
+      if (veh && veh.exitWeight && veh.entryWeight) {
+        const netWeight = Math.abs(veh.exitWeight - veh.entryWeight)
+        setStockQuantity(netWeight.toFixed(2))
+      }
+    } else {
+      setStockQuantity('')
     }
   }
 
@@ -235,10 +269,18 @@ export default function Inventory() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <button className="btn btn-secondary btn-sm">
-          <Filter size={16} /> Filters
-        </button>
+        <select 
+          className="form-select btn-sm" 
+          style={{ width: '150px' }}
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+        >
+          <option value="all">All Categories</option>
+          <option value="raw">Raw Materials</option>
+          <option value="finished">Finished Goods</option>
+        </select>
       </div>
+
 
       {/* Main Content Card */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -280,6 +322,17 @@ export default function Inventory() {
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                         <button 
                           className="btn btn-ghost btn-sm" 
+                          style={{ color: 'var(--color-primary-600)' }}
+                          onClick={() => {
+                            setSelectedMaterialHistory(mat)
+                            setIsHistoryModalOpen(true)
+                          }}
+                          title="View History"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button 
+                          className="btn btn-ghost btn-sm" 
                           onClick={() => {
                             setEditingMaterial(mat)
                             setIsMaterialModalOpen(true)
@@ -295,6 +348,7 @@ export default function Inventory() {
                           <Trash2 size={16} />
                         </button>
                       </div>
+
                     </td>
                   </tr>
                 )
@@ -441,13 +495,43 @@ export default function Inventory() {
             </div>
             <div className="form-group">
               <label className="form-label">Quantity</label>
-              <input type="number" step="0.01" name="quantity" className="form-input" placeholder="0.00" required />
+              <input 
+                type="number" 
+                step="0.01" 
+                name="quantity" 
+                className="form-input" 
+                placeholder="0.00" 
+                value={stockQuantity}
+                onChange={(e) => setStockQuantity(e.target.value)}
+                required 
+              />
             </div>
+
           </div>
           <div className="form-group">
-            <label className="form-label">Source / Vehicle No.</label>
-            <input name="source" className="form-input" placeholder="e.g. Supplier Name or Truck No." />
+            <label className="form-label">Link to Vehicle (Truck)</label>
+            <select 
+              className="form-select" 
+              value={selectedVehicleId} 
+              onChange={(e) => handleVehicleChange(e.target.value)}
+            >
+
+              <option value="none">None (Manual Entry)</option>
+              {vehicles.map(v => (
+                <option key={v.id} value={v.id}>
+                  {v.vehicleNo} | {v.driverName} | {v.materialType} | {formatDate(v.entryTime).split(',')[0]}
+                </option>
+              ))}
+            </select>
           </div>
+
+          {selectedVehicleId === 'none' && (
+            <div className="form-group">
+              <label className="form-label">Source / Description</label>
+              <input name="source_manual" className="form-input" placeholder="e.g. Supplier Name or Manual Adjustment" />
+            </div>
+          )}
+
           <div className="form-group">
             <label className="form-label">Note / Description</label>
             <textarea name="note" className="form-textarea" rows="2" placeholder="Optional notes..."></textarea>
@@ -458,6 +542,68 @@ export default function Inventory() {
           </div>
         </form>
       </Modal>
+
+      {/* --- Material History Modal --- */}
+      <Modal 
+        isOpen={isHistoryModalOpen} 
+        onClose={() => setIsHistoryModalOpen(false)}
+        title={`Stock History: ${selectedMaterialHistory?.name}`}
+        size="lg"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+            <div className="card" style={{ padding: '12px', background: '#f8fafc' }}>
+              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Current Stock</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800 }}>{selectedMaterialHistory?.currentStock} {selectedMaterialHistory?.unit}</div>
+            </div>
+            <div className="card" style={{ padding: '12px', background: '#f0fdf4' }}>
+              <div style={{ fontSize: '0.75rem', color: '#166534' }}>Total Incoming</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#166534' }}>
+                {logs.filter(l => l.materialId === selectedMaterialHistory?.id && l.type === 'in').reduce((s, l) => s + l.quantity, 0)} {selectedMaterialHistory?.unit}
+              </div>
+            </div>
+            <div className="card" style={{ padding: '12px', background: '#fef2f2' }}>
+              <div style={{ fontSize: '0.75rem', color: '#991b1b' }}>Total Outgoing</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#991b1b' }}>
+                {logs.filter(l => l.materialId === selectedMaterialHistory?.id && l.type === 'out').reduce((s, l) => s + l.quantity, 0)} {selectedMaterialHistory?.unit}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid #e7e5e4', borderRadius: '8px' }}>
+            <table className="data-table" style={{ fontSize: '0.8125rem' }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Qty</th>
+                  <th>Source/Vehicle</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs
+                  .filter(l => l.materialId === selectedMaterialHistory?.id)
+                  .sort((a, b) => new Date(b.date) - new Date(a.date))
+                  .map(log => (
+                    <tr key={log.id}>
+                      <td>{formatDate(log.date)}</td>
+                      <td>
+                        <span className={`badge ${log.type === 'in' ? 'badge-info' : 'badge-warning'}`} style={{ padding: '2px 6px', fontSize: '0.7rem' }}>
+                          {log.type === 'in' ? 'IN' : 'OUT'}
+                        </span>
+                      </td>
+                      <td style={{ fontWeight: 600, color: log.type === 'in' ? '#059669' : '#dc2626' }}>
+                        {log.type === 'in' ? '+' : '-'}{log.quantity}
+                      </td>
+                      <td>{log.source || '-'}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
+

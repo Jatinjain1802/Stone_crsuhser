@@ -15,7 +15,9 @@ import Login from './pages/Auth/Login'
 import Dashboard from './pages/Dashboard/Dashboard'
 import Inventory from './pages/Inventory/Inventory'
 import Billing from './pages/Billing/Billing'
+import Payments from './pages/Payments/Payments'
 import Vehicles from './pages/Vehicles/Vehicles'
+
 import Customers from './pages/Customers/Customers'
 import Expenses from './pages/Expenses/Expenses'
 import Production from './pages/Production/Production'
@@ -62,7 +64,9 @@ export default function App() {
           <Route path="production" element={<Production />} />
           <Route path="vehicles" element={<Vehicles />} />
           <Route path="billing" element={<Billing />} />
+          <Route path="payments" element={<Payments />} />
           <Route path="customers" element={<Customers />} />
+
           <Route path="expenses" element={<Expenses />} />
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />

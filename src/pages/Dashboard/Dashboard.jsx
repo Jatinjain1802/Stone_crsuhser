@@ -10,6 +10,7 @@
 // ---------------------------------------------------------------
 
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { 
   TrendingUp, 
   Users, 
@@ -36,12 +37,22 @@ import { dashboardService } from '@/services/api'
 import { formatCurrency, formatNumber, getStatusBadge, getStatusLabel } from '@/utils/format.util'
 import { formatDate, timeAgo } from '@/utils/date.util'
 import useAppStore from '@/store/appStore'
+import Modal from '@/components/shared/Modal'
+import { Eye, Download, Printer } from 'lucide-react'
+import { generateInvoicePDF } from '@/utils/pdf.util'
+
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null)
   const [trend, setTrend] = useState([])
   const [loading, setLoading] = useState(true)
+  const [selectedInvoice, setSelectedInvoice] = useState(null)
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false)
+  const [downloadingId, setDownloadingId] = useState(null)
+  const navigate = useNavigate()
+
   const { notify } = useAppStore()
+
 
   // Fetch dashboard data on component mount
   useEffect(() => {
@@ -100,7 +111,7 @@ export default function Dashboard() {
         gap: '24px' 
       }}>
         {/* Today's Sales */}
-        <div className="stat-card">
+        <div className="stat-card" onClick={() => navigate('/billing')} style={{ cursor: 'pointer' }}>
           <div className="stat-icon" style={{ background: '#ecfdf5', color: '#059669' }}>
             <TrendingUp size={24} />
           </div>
@@ -112,6 +123,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
 
         {/* Month Sales */}
         <div className="stat-card">
@@ -128,7 +140,7 @@ export default function Dashboard() {
         </div>
 
         {/* Pending Payments */}
-        <div className="stat-card">
+        <div className="stat-card" onClick={() => navigate('/payments')} style={{ cursor: 'pointer' }}>
           <div className="stat-icon" style={{ background: '#fffbeb', color: '#d97706' }}>
             <Users size={24} />
           </div>
@@ -141,8 +153,9 @@ export default function Dashboard() {
           </div>
         </div>
 
+
         {/* Low Stock Alerts */}
-        <div className="stat-card">
+        <div className="stat-card" onClick={() => navigate('/inventory')} style={{ cursor: 'pointer' }}>
           <div className="stat-icon" style={{ 
             background: stats?.lowStockCount > 0 ? '#fef2f2' : '#f5f5f4', 
             color: stats?.lowStockCount > 0 ? '#dc2626' : '#78716c' 
@@ -161,6 +174,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
       </div>
 
       {/* Main Charts Row */}
@@ -226,9 +240,14 @@ export default function Dashboard() {
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">Stock Summary</h2>
-            <button className="btn btn-ghost btn-sm" style={{ padding: 4 }}>
+            <button 
+              className="btn btn-ghost btn-sm" 
+              style={{ padding: 4 }}
+              onClick={() => navigate('/inventory')}
+            >
               <ArrowUpRight size={18} />
             </button>
+
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
             {stats?.materialSummary?.map(mat => {
@@ -271,8 +290,9 @@ export default function Dashboard() {
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Recent Invoices</h2>
-          <button className="btn btn-secondary btn-sm">View All Invoices</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => navigate('/billing')}>View All Invoices</button>
         </div>
+
         <div style={{ overflowX: 'auto', marginTop: '16px' }}>
           <table className="data-table">
             <thead>
@@ -301,8 +321,18 @@ export default function Dashboard() {
                     </span>
                   </td>
                   <td>
-                    <button className="btn btn-ghost btn-sm">Details</button>
+                    <button 
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        setSelectedInvoice(inv)
+                        setIsViewModalOpen(true)
+                      }}
+                    >
+                      <Eye size={16} style={{ marginRight: 4 }} /> Details
+                    </button>
                   </td>
+
+
                 </tr>
               ))}
               {(!stats?.recentInvoices || stats.recentInvoices.length === 0) && (
@@ -316,6 +346,101 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
+
+      {/* --- Invoice Details Modal --- */}
+      <Modal 
+        isOpen={isViewModalOpen} 
+        onClose={() => {
+          setIsViewModalOpen(false)
+          setSelectedInvoice(null)
+        }} 
+        title={`Invoice Details: ${selectedInvoice?.invoiceNo}`}
+        size="lg"
+      >
+        {selectedInvoice && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Header Info */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e7e5e4', paddingBottom: '16px' }}>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: '#78716c', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Customer Details</div>
+                <div style={{ fontSize: '1.125rem', fontWeight: 700, color: '#1c1917' }}>{selectedInvoice.customer.name}</div>
+                <div style={{ fontSize: '0.875rem', color: '#44403c' }}>{selectedInvoice.customer.mobile}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '0.75rem', color: '#78716c', textTransform: 'uppercase' }}>Invoice Date</div>
+                <div style={{ fontSize: '1rem', fontWeight: 600 }}>{formatDate(selectedInvoice.date)}</div>
+                <div style={{ marginTop: '8px' }}>
+                  <span className={`badge ${getStatusBadge(selectedInvoice.status)}`}>
+                    {getStatusLabel(selectedInvoice.status)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Items Table */}
+            <div>
+              <table className="data-table">
+                <thead style={{ background: '#f8f9fa' }}>
+                  <tr>
+                    <th>Material</th>
+                    <th style={{ textAlign: 'right' }}>Qty</th>
+                    <th style={{ textAlign: 'right' }}>Rate</th>
+                    <th style={{ textAlign: 'right' }}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedInvoice?.items?.map((item, idx) => (
+                    <tr key={idx}>
+                      <td style={{ fontWeight: 500 }}>{item.material?.name}</td>
+                      <td style={{ textAlign: 'right' }}>{item.quantity} {item.material?.unit}</td>
+                      <td style={{ textAlign: 'right' }}>{formatNumber(item.rate)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatNumber(item.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+
+              </table>
+            </div>
+
+            {/* Totals Section */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ width: '250px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                  <span style={{ color: '#78716c' }}>Subtotal:</span>
+                  <span>{formatCurrency(selectedInvoice.subtotal)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                  <span style={{ color: '#78716c' }}>GST ({selectedInvoice.gstPercent}%):</span>
+                  <span>{formatCurrency(selectedInvoice.gstAmount)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.125rem', fontWeight: 800, color: 'var(--color-primary-600)', borderTop: '1px solid #e7e5e4', paddingTop: '8px', marginTop: '4px' }}>
+                  <span>Total:</span>
+                  <span>{formatCurrency(selectedInvoice.totalAmount)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid #e7e5e4', paddingTop: '20px' }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={async () => {
+                  setDownloadingId(selectedInvoice.id)
+                  await generateInvoicePDF(selectedInvoice)
+                  setDownloadingId(null)
+                }}
+                disabled={downloadingId === selectedInvoice.id}
+              >
+                {downloadingId === selectedInvoice.id ? 'Generating...' : <><Download size={18} /> Download PDF</>}
+              </button>
+              <button className="btn btn-primary" onClick={() => window.print()}>
+                <Printer size={18} /> Print Invoice
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }
+

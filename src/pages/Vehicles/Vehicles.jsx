@@ -36,6 +36,8 @@ export default function Vehicles() {
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false)
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [selectedVehicle, setSelectedVehicle] = useState(null)
+  const [movementType, setMovementType] = useState('out') // 'out' (Outgoing) or 'in' (Incoming)
+
   
   const { notify } = useAppStore()
   const { user } = useAuthStore()
@@ -68,10 +70,11 @@ export default function Vehicles() {
       driverName: formData.get('driverName'),
       materialType: formData.get('materialType'),
       entryWeight: parseFloat(formData.get('entryWeight')),
-      type: formData.get('type'),
+      type: movementType, // Use the state instead of radio value for better reliability
       challanNo: formData.get('challanNo'),
       createdBy: user.id
     }
+
 
     try {
       const result = await vehicleService.createEntry(data)
@@ -238,30 +241,43 @@ export default function Vehicles() {
           <div className="form-group">
             <label className="form-label">Movement Type</label>
             <div style={{ display: 'flex', gap: '12px' }}>
-              <label style={{ flex: 1, cursor: 'pointer' }}>
-                <input type="radio" name="type" value="out" defaultChecked style={{ display: 'none' }} />
-                <div style={{ 
-                  padding: '10px', 
-                  border: '1px solid #e7e5e4', 
+              <div 
+                onClick={() => setMovementType('out')}
+                style={{ 
+                  flex: 1, 
+                  padding: '12px', 
+                  border: movementType === 'out' ? '2px solid var(--color-primary-500)' : '1px solid #e7e5e4', 
                   borderRadius: '8px', 
                   textAlign: 'center',
-                  fontSize: '0.875rem',
-                  fontWeight: 600
-                }}>Outgoing Load</div>
-              </label>
-              <label style={{ flex: 1, cursor: 'pointer' }}>
-                <input type="radio" name="type" value="in" style={{ display: 'none' }} />
-                <div style={{ 
-                  padding: '10px', 
-                  border: '1px solid #e7e5e4', 
+                  background: movementType === 'out' ? 'var(--color-primary-50)' : 'transparent',
+                  color: movementType === 'out' ? 'var(--color-primary-700)' : '#78716c',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <ArrowRightLeft size={18} style={{ marginBottom: '4px' }} />
+                <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>Outgoing Load</div>
+              </div>
+              <div 
+                onClick={() => setMovementType('in')}
+                style={{ 
+                  flex: 1, 
+                  padding: '12px', 
+                  border: movementType === 'in' ? '2px solid var(--color-primary-500)' : '1px solid #e7e5e4', 
                   borderRadius: '8px', 
                   textAlign: 'center',
-                  fontSize: '0.875rem',
-                  fontWeight: 600
-                }}>Incoming Raw</div>
-              </label>
+                  background: movementType === 'in' ? 'var(--color-primary-50)' : 'transparent',
+                  color: movementType === 'in' ? 'var(--color-primary-700)' : '#78716c',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <Scale size={18} style={{ marginBottom: '4px' }} />
+                <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>Incoming Raw</div>
+              </div>
             </div>
           </div>
+
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div className="form-group">

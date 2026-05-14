@@ -32,7 +32,7 @@ module.exports = {
         arch: ["x64"]     // 64-bit windows ke liye
       }
     ],
-    icon: "assets/logo.png" // App ka icon (ensure this exists)
+    // icon: "assets/logo.png" // App ka icon (ensure this exists and is .ico for Windows)
   },
 
   // Installer (NSIS) settings
@@ -40,8 +40,8 @@ module.exports = {
     oneClick: false,              // User ko "Next" buttons dikhayega
     allowToChangeInstallationDirectory: true,
     createDesktopShortcut: true,  // Desktop par icon banayega
-    installerIcon: "assets/logo.png",
-    uninstallerIcon: "assets/logo.png"
+    // installerIcon: "assets/logo.png",
+    // uninstallerIcon: "assets/logo.png"
   },
 
   // Build output folder

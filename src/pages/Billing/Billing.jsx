@@ -10,6 +10,7 @@
 // ---------------------------------------------------------------
 
 import React, { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { 
   Plus, 
   Search, 
@@ -18,20 +19,30 @@ import {
   Download, 
   Trash2, 
   UserPlus,
-  ArrowRight
+  ArrowRight,
+  Eye,
+  AlertTriangle,
+  Loader2
 } from 'lucide-react'
+
 import { billingService, customerService, inventoryService } from '@/services/api'
 import { formatCurrency, formatNumber, getStatusBadge, getStatusLabel } from '@/utils/format.util'
 import { formatDate } from '@/utils/date.util'
 import useAppStore from '@/store/appStore'
 import useAuthStore from '@/store/authStore'
 import Modal from '@/components/shared/Modal'
+import { generateInvoicePDF } from '@/utils/pdf.util'
+
 
 export default function Billing() {
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   
   // New Invoice states
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false)
+  const [selectedInvoice, setSelectedInvoice] = useState(null)
+  const location = useLocation()
+
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
   const [customers, setCustomers] = useState([])
   const [materials, setMaterials] = useState([])
@@ -40,6 +51,14 @@ export default function Billing() {
   const [selectedCustomer, setSelectedCustomer] = useState('')
   const [invoiceItems, setInvoiceItems] = useState([{ materialId: '', quantity: 1, rate: 0, amount: 0 }])
   const [gstPercent, setGstPercent] = useState(18)
+  const [status, setStatus] = useState('unpaid')
+  const [paymentMode, setPaymentMode] = useState('credit')
+  
+  // View & UI states
+  const [viewingInvoice, setViewingInvoice] = useState(null)
+  const [downloadingId, setDownloadingId] = useState(null)
+
+
   
   const { notify } = useAppStore()
   const { user } = useAuthStore()
@@ -65,7 +84,16 @@ export default function Billing() {
 
   useEffect(() => {
     fetchData()
-  }, [])
+    
+    // Check if we arrived here with an invoice to view (from Dashboard)
+    if (location.state?.viewInvoice) {
+      setSelectedInvoice(location.state.viewInvoice)
+      setIsViewModalOpen(true)
+      // Clear the state so it doesn't reopen on refresh
+      window.history.replaceState({}, document.title)
+    }
+  }, [location.state])
+
 
   // --- Calculations ---
 
@@ -95,6 +123,30 @@ export default function Billing() {
   const addItem = () => setInvoiceItems([...invoiceItems, { materialId: '', quantity: 1, rate: 0, amount: 0 }])
   const removeItem = (index) => setInvoiceItems(invoiceItems.filter((_, i) => i !== index))
 
+  const handleDownloadPDF = async (inv) => {
+    setDownloadingId(inv.id)
+    try {
+      await generateInvoicePDF(inv)
+      notify.success('Invoice downloaded')
+    } catch (error) {
+      notify.error('PDF generation failed')
+    } finally {
+      setDownloadingId(null)
+    }
+  }
+
+  // Check credit limit for selected customer
+  const getCustomerOutstanding = (custId) => {
+    return invoices
+      .filter(inv => inv.customerId === parseInt(custId) && inv.status !== 'paid')
+      .reduce((sum, inv) => sum + (inv.totalAmount - inv.paidAmount), 0)
+  }
+
+  const selectedCustObj = customers.find(c => c.id === parseInt(selectedCustomer))
+  const currentOutstanding = selectedCustomer ? getCustomerOutstanding(selectedCustomer) : 0
+  const isOverLimit = selectedCustObj && (currentOutstanding + totalAmount > selectedCustObj.creditLimit)
+
+
   // --- Actions ---
 
   const handleCreateInvoice = async (e) => {
@@ -114,9 +166,11 @@ export default function Billing() {
         amount: parseFloat(item.amount)
       })),
       gstPercent: parseFloat(gstPercent),
-      paymentMode: 'credit',
+      status,
+      paymentMode: status === 'paid' ? paymentMode : 'credit',
       createdBy: user.id
     }
+
 
     try {
       const result = await billingService.createInvoice(data)
@@ -137,7 +191,10 @@ export default function Billing() {
     setSelectedCustomer('')
     setInvoiceItems([{ materialId: '', quantity: 1, rate: 0, amount: 0 }])
     setGstPercent(18)
+    setStatus('unpaid')
+    setPaymentMode('credit')
   }
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -208,10 +265,26 @@ export default function Billing() {
                 </td>
                 <td style={{ textAlign: 'right' }}>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                    <button className="btn btn-ghost btn-sm" title="Print PDF"><Printer size={16} /></button>
-                    <button className="btn btn-ghost btn-sm" title="Download"><Download size={16} /></button>
+                    <button 
+                      className="btn btn-ghost btn-sm" 
+                      title="View Details"
+                      onClick={() => setViewingInvoice(inv)}
+                    >
+                      <Eye size={16} />
+                    </button>
+                    <button 
+                      className="btn btn-ghost btn-sm" 
+                      title="Download PDF"
+                      disabled={downloadingId === inv.id}
+                      onClick={() => handleDownloadPDF(inv)}
+                    >
+                      {downloadingId === inv.id ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                    </button>
+                    <button className="btn btn-ghost btn-sm" title="Print"><Printer size={16} /></button>
                   </div>
                 </td>
+
+
               </tr>
             ))}
             {invoices.length === 0 && (
@@ -245,7 +318,34 @@ export default function Billing() {
                 <option value="">Select Customer...</option>
                 {customers.map(c => <option key={c.id} value={c.id}>{c.name} ({c.mobile})</option>)}
               </select>
+
+              {selectedCustObj && (
+                <div style={{ marginTop: '8px', fontSize: '0.75rem', display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#78716c' }}>Current Outstanding: <b>{formatCurrency(currentOutstanding)}</b></span>
+                  <span style={{ color: isOverLimit ? '#ef4444' : '#10b981', fontWeight: 600 }}>
+                    Limit: {formatCurrency(selectedCustObj.creditLimit)}
+                  </span>
+                </div>
+              )}
+              {isOverLimit && (
+                <div style={{ 
+                  marginTop: '12px', 
+                  padding: '8px 12px', 
+                  background: '#fef2f2', 
+                  border: '1px solid #fee2e2',
+                  borderRadius: '6px',
+                  color: '#991b1b',
+                  fontSize: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <AlertTriangle size={14} />
+                  <span>Warning: This invoice will exceed customer's credit limit!</span>
+                </div>
+              )}
             </div>
+
             <div className="form-group">
               <label className="form-label">GST Percentage (%)</label>
               <select 
@@ -259,6 +359,34 @@ export default function Billing() {
                 <option value="28">28% GST</option>
               </select>
             </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+            <div className="form-group">
+              <label className="form-label">Payment Status</label>
+              <select 
+                className="form-select" 
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
+                <option value="unpaid">Unpaid (Credit)</option>
+                <option value="paid">Full Paid</option>
+              </select>
+            </div>
+            {status === 'paid' && (
+              <div className="form-group">
+                <label className="form-label">Payment Mode</label>
+                <select 
+                  className="form-select" 
+                  value={paymentMode}
+                  onChange={(e) => setPaymentMode(e.target.value)}
+                >
+                  <option value="cash">Cash</option>
+                  <option value="upi">UPI / Online</option>
+                  <option value="bank">Bank Transfer</option>
+                </select>
+              </div>
+            )}
           </div>
 
           <div className="divider"></div>
@@ -363,6 +491,84 @@ export default function Billing() {
           </div>
         </form>
       </Modal>
+
+      {/* --- View Invoice Details Modal --- */}
+      <Modal
+        isOpen={!!viewingInvoice}
+        onClose={() => setViewingInvoice(null)}
+        title={`Invoice Details: ${viewingInvoice?.invoiceNo}`}
+        size="md"
+      >
+        {viewingInvoice && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div>
+                <label className="stat-label">Customer</label>
+                <div style={{ fontWeight: 600 }}>{viewingInvoice.customer.name}</div>
+                <div style={{ fontSize: '0.75rem', color: '#78716c' }}>{viewingInvoice.customer.mobile}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <label className="stat-label">Date</label>
+                <div style={{ fontWeight: 600 }}>{formatDate(viewingInvoice.date)}</div>
+                <span className={`badge ${getStatusBadge(viewingInvoice.status)}`}>
+                  {getStatusLabel(viewingInvoice.status)}
+                </span>
+              </div>
+            </div>
+
+            <div className="divider" style={{ margin: '8px 0' }}></div>
+
+            <table className="data-table" style={{ fontSize: '0.875rem' }}>
+              <thead>
+                <tr style={{ background: '#f9fafb' }}>
+                  <th>Material</th>
+                  <th style={{ textAlign: 'right' }}>Qty</th>
+                  <th style={{ textAlign: 'right' }}>Rate</th>
+                  <th style={{ textAlign: 'right' }}>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {viewingInvoice.items.map((item, idx) => (
+                  <tr key={idx}>
+                    <td>{item.material.name}</td>
+                    <td style={{ textAlign: 'right' }}>{item.quantity}</td>
+                    <td style={{ textAlign: 'right' }}>{formatNumber(item.rate)}</td>
+                    <td style={{ textAlign: 'right' }}>{formatNumber(item.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div style={{ alignSelf: 'flex-end', width: '200px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#78716c' }}>Subtotal:</span>
+                <span>{formatCurrency(viewingInvoice.subtotal)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#78716c' }}>GST:</span>
+                <span>{formatCurrency(viewingInvoice.gstAmount)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: 'var(--color-primary-600)' }}>
+                <span>Total:</span>
+                <span>{formatCurrency(viewingInvoice.totalAmount)}</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
+              <button className="btn btn-secondary" onClick={() => setViewingInvoice(null)}>Close</button>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => handleDownloadPDF(viewingInvoice)}
+                disabled={downloadingId === viewingInvoice.id}
+              >
+                {downloadingId === viewingInvoice.id ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                <span style={{ marginLeft: 8 }}>Download PDF</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
+
   )
 }

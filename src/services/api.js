@@ -75,7 +75,11 @@ export const billingService = {
   createInvoice:  (data)    => invoke('billing:create-invoice', data),
   addPayment:     (data)    => invoke('billing:add-payment', data),
   getOutstanding: ()        => invoke('billing:get-outstanding'),
+  getCustomerUnpaid: (id)   => invoke('billing:get-customer-unpaid', id),
+  getPaymentStats: ()       => invoke('billing:get-payment-stats'),
 }
+
+
 
 // ---------------------------------------------------------------
 // Vehicle Service

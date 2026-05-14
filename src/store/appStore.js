@@ -22,7 +22,9 @@ const useAppStore = create((set, get) => ({
   // addNotification: Show a toast message
   // type: 'success' | 'error' | 'warning' | 'info'
   addNotification: (message, type = 'info') => {
-    const id = Date.now() // Use timestamp as unique ID
+    // Combine timestamp with a random number to ensure uniqueness
+    const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
     
     set((state) => ({
       notifications: [...state.notifications, { id, message, type }]

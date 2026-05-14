@@ -22,23 +22,23 @@ const isDev = process.env.NODE_ENV === 'development'
 
 // ---------------------------------------------------------------
 // PRODUCTION DATABASE SETUP
-// When running from .exe, the database should be in a user data folder
 // ---------------------------------------------------------------
 const userDataPath = app.getPath('userData')
-const dbPath = isDev 
-  ? path.join(__dirname, '../database/stone_crusher.db')
-  : path.join(userDataPath, 'stone_crusher.db')
+const projectRoot = path.join(__dirname, '..')
 
-// Create database folder if it doesn't exist (Production only)
-if (!isDev) {
-  const dbDir = path.dirname(dbPath)
-  if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true })
-  
-  // Also set the environment variable for Prisma
-  process.env.DATABASE_URL = `file:${dbPath}`
-} else {
-  process.env.DATABASE_URL = `file:${path.resolve(__dirname, '../database/stone_crusher.db')}`
+const dbPath = isDev 
+  ? path.resolve(projectRoot, 'database', 'stone_crusher.db')
+  : path.resolve(userDataPath, 'stone_crusher.db')
+
+// Create database folder if it doesn't exist
+const dbDir = path.dirname(dbPath)
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true })
 }
+
+// Set DATABASE_URL for Prisma BEFORE importing any IPC handlers
+process.env.DATABASE_URL = `file:${dbPath}`
+console.log('[Main] Database Path:', dbPath)
 
 // Import all IPC handlers (these handle DB operations)
 const { registerAuthHandlers } = require('./ipc/auth.ipc')
