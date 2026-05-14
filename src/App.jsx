@@ -20,9 +20,9 @@ import Vehicles from './pages/Vehicles/Vehicles'
 
 import Customers from './pages/Customers/Customers'
 import Expenses from './pages/Expenses/Expenses'
-import Production from './pages/Production/Production'
 import Reports from './pages/Reports/Reports'
 import Settings from './pages/Settings/Settings'
+
 import useAuthStore from './store/authStore'
 
 /**
@@ -61,8 +61,8 @@ export default function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="inventory" element={<Inventory />} />
-          <Route path="production" element={<Production />} />
           <Route path="vehicles" element={<Vehicles />} />
+
           <Route path="billing" element={<Billing />} />
           <Route path="payments" element={<Payments />} />
           <Route path="customers" element={<Customers />} />

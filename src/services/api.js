@@ -77,7 +77,9 @@ export const billingService = {
   getOutstanding: ()        => invoke('billing:get-outstanding'),
   getCustomerUnpaid: (id)   => invoke('billing:get-customer-unpaid', id),
   getPaymentStats: ()       => invoke('billing:get-payment-stats'),
+  getPayments: (limit)      => invoke('billing:get-payments', limit),
 }
+
 
 
 

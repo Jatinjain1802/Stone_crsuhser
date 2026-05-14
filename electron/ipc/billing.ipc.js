@@ -282,6 +282,24 @@ function registerBillingHandlers(ipcMain) {
       return { success: false, message: error.message }
     }
   })
+
+  // Get Recent Payments
+  ipcMain.handle('billing:get-payments', async (event, limit = 50) => {
+    try {
+      const payments = await prisma.payment.findMany({
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          invoice: {
+            include: { customer: true }
+          }
+        }
+      })
+      return { success: true, payments }
+    } catch (error) {
+      return { success: false, message: error.message }
+    }
+  })
 }
 
 

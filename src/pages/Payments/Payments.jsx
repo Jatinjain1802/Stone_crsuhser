@@ -33,6 +33,8 @@ export default function Payments() {
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [stats, setStats] = useState({ totalOutstanding: 0, collectionsToday: 0, activeCustomers: 0, paymentCount: 0 })
+  const [recentPayments, setRecentPayments] = useState([])
+
 
   
   // Form State
@@ -52,7 +54,16 @@ export default function Payments() {
   useEffect(() => {
     fetchCustomers()
     fetchStats()
+    fetchRecentPayments()
   }, [])
+
+  const fetchRecentPayments = async () => {
+    try {
+      const result = await billingService.getPayments()
+      if (result.success) setRecentPayments(result.payments)
+    } catch (error) {}
+  }
+
 
   const fetchStats = async () => {
     try {
@@ -98,20 +109,35 @@ export default function Payments() {
     setSubmitting(true)
     try {
       if (paymentType === 'direct') {
-        // 1. Direct Payment Logic (Apply to oldest invoices)
-        const result = await billingService.addPayment({
-          invoiceId: unpaidInvoices[0].id,
-          amount: parseFloat(amount),
-          paymentMode,
-          reference: remarks,
-          date: new Date().toISOString()
-        })
-        
-        if (result.success) {
-          notify.success('Direct payment recorded')
-          generateReceiptAndClose()
+        if (unpaidInvoices.length === 0) {
+          notify.error('No unpaid invoices found for this customer')
+          setSubmitting(false)
+          return
         }
+
+        // --- SMART LUMP SUM LOGIC ---
+        // Apply amount across all unpaid invoices sequentially (FIFO)
+        let remainingAmount = parseFloat(amount)
+        for (const inv of unpaidInvoices) {
+          if (remainingAmount <= 0) break
+          
+          const balance = inv.totalAmount - inv.paidAmount
+          const payNow = Math.min(remainingAmount, balance)
+
+          await billingService.addPayment({
+            invoiceId: inv.id,
+            amount: payNow,
+            paymentMode,
+            reference: remarks,
+            date: new Date().toISOString()
+          })
+          remainingAmount -= payNow
+        }
+        
+        notify.success('Lump-sum payment recorded across bills')
+        generateReceiptAndClose()
       } else {
+
         // 2. Bill-wise Payment Logic
         if (selectedInvoices.length === 0) {
           notify.error('Please select at least one bill')
@@ -149,16 +175,20 @@ export default function Payments() {
   }
 
   const generateReceiptAndClose = () => {
+    const selectedCust = customers.find(c => c.id === parseInt(selectedCustomer))
     generatePaymentReceiptPDF({
       amount: parseFloat(amount),
-      customerName: selectedCustObj?.name,
+      customerName: selectedCust?.name || 'Customer',
       paymentMode,
       reference: remarks
     })
     setIsModalOpen(false)
     resetForm()
-    fetchUnpaidInvoices(selectedCustomer) // Refresh the list
+    fetchUnpaidInvoices(selectedCustomer) // Refresh current
+    fetchStats() // Refresh totals
+    fetchRecentPayments() // Refresh history
   }
+
 
   const toggleInvoiceSelection = (id) => {
     setSelectedInvoices(prev => 
@@ -202,12 +232,56 @@ export default function Payments() {
       </div>
 
 
-      {/* Placeholder for Recent Payments Table */}
-      <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#a8a29e' }}>
-        <IndianRupee size={48} style={{ margin: '0 auto 16px', opacity: 0.2 }} />
-        <h3>No recent payments found</h3>
-        <p>Start recording payments to see history here.</p>
+      {/* Recent Payments Table */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="card-header" style={{ padding: '20px' }}>
+          <h2 className="card-title">Recent Payment Collections</h2>
+        </div>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Customer</th>
+              <th>Invoice No</th>
+              <th>Mode</th>
+              <th>Amount</th>
+              <th style={{ textAlign: 'right' }}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recentPayments.map(p => (
+              <tr key={p.id}>
+                <td>{formatDate(p.createdAt)}</td>
+                <td style={{ fontWeight: 600 }}>{p.invoice?.customer?.name || 'Unknown'}</td>
+                <td className="font-mono">{p.invoice?.invoiceNo}</td>
+                <td><span className="badge badge-neutral" style={{ textTransform: 'uppercase' }}>{p.paymentMode}</span></td>
+                <td style={{ fontWeight: 700, color: '#059669' }}>{formatCurrency(p.amount)}</td>
+                <td style={{ textAlign: 'right' }}>
+                  <button 
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => generatePaymentReceiptPDF({
+                      amount: p.amount,
+                      customerName: p.invoice?.customer?.name,
+                      paymentMode: p.paymentMode,
+                      reference: p.reference
+                    })}
+                  >
+                    <Download size={16} style={{ marginRight: 4 }} /> Receipt
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {recentPayments.length === 0 && (
+              <tr>
+                <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: '#a8a29e' }}>
+                  No payment records found
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
+
 
       {/* --- Record Payment Modal --- */}
       <Modal 

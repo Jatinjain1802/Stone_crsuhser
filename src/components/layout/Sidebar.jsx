@@ -30,8 +30,8 @@ import useAuthStore from '@/store/authStore'
 const MENU_ITEMS = [
   { label: 'Dashboard', path: '/', icon: <LayoutDashboard size={20} /> },
   { label: 'Inventory', path: '/inventory', icon: <Package size={20} /> },
-  { label: 'Production', path: '/production', icon: <Hammer size={20} /> },
   { label: 'Vehicles', path: '/vehicles', icon: <Truck size={20} /> },
+
   { label: 'Billing', path: '/billing', icon: <FileText size={20} /> },
   { label: 'Payments', path: '/payments', icon: <Wallet size={20} /> },
   { label: 'Customers', path: '/customers', icon: <Users size={20} /> },
